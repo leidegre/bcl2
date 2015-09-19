@@ -49,7 +49,6 @@
     </Compile>
     <Compile Include="BigEndianTests.cs" />
     <Compile Include="ByteArrayComparerTests.cs" />
-    <Compile Include="EnumerableAssert.cs" />
     <Compile Include="PositionalNotation\AlphabetTests.cs" />
     <Compile Include="PositionalNotation\PositionalNotationTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
