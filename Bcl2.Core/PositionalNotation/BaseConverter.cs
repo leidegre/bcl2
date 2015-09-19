@@ -15,13 +15,6 @@ namespace Bcl2.PositionalNotation
     private readonly int _charCountPerUInt32;
     private readonly int _charCountPerUInt64;
 
-    /// <remarks>
-    /// There's a subtle coding issue with some bases where the char count required for 7 bytes is
-    /// indistinguishable from 8 bytes. To resolve this ambiguity, we use a single padding char.
-    /// This padding is only applicable to the coding of byte strings and only when the length is evenly divisible by 7.
-    /// </remarks>
-    private readonly bool _hasCodingIssue;
-
     public BaseConverter(string name, Alphabet alphabet)
     {
       _name = name;
@@ -30,10 +23,6 @@ namespace Bcl2.PositionalNotation
       _charCountPerUInt16 = (int)Math.Ceiling(Math.Log(Math.Pow(2, 16), alphabet.Base));
       _charCountPerUInt32 = (int)Math.Ceiling(Math.Log(Math.Pow(2, 32), alphabet.Base));
       _charCountPerUInt64 = (int)Math.Ceiling(Math.Log(Math.Pow(2, 64), alphabet.Base));
-      if ((_charCountPerByte + _charCountPerUInt16 + _charCountPerUInt32) == _charCountPerUInt64)
-      {
-        _hasCodingIssue = true;
-      }
     }
 
     //// Encode
@@ -94,59 +83,67 @@ namespace Bcl2.PositionalNotation
     {
       while (length >= 8)
       {
-        var v = BitConverter.ToUInt64(bytes, offset);
-        if (BitConverter.IsLittleEndian)
-        {
-          // for correctness yo! (trivia: Xbox360 is big endian and it can run .NET yay!)
-          v = v.ByteSwap();
-        }
+        var v = BigEndian.ToUInt64(bytes, offset);
         Encode(v, sb);
         offset += 8;
         length -= 8;
       }
-      bool appendPaddingChar = _hasCodingIssue & (length == 7);
-#if DELIMITER
-      sb.Append('-', 1);
-#endif
-      if (length >= 4)
+      // remainder?
+      if ((length & 7) != 0)
       {
-        var v = BitConverter.ToUInt32(bytes, offset);
-        if (BitConverter.IsLittleEndian)
-        {
-          v = v.ByteSwap();
-        }
-        Encode(v, sb);
-        offset += 4;
-        length -= 4;
+        EncodeRemainder(bytes, offset, length, sb);
       }
-#if DELIMITER
-      sb.Append('-', 1);
-#endif
-      if (length >= 2)
+    }
+
+    public void EncodeRemainder(byte[] bytes, int offset, int length, StringBuilder sb)
+    {
+      ulong v = 0;
+      switch (length & 7)
       {
-        var v = BitConverter.ToUInt16(bytes, offset);
-        if (BitConverter.IsLittleEndian)
-        {
-          v = v.ByteSwap();
-        }
-        Encode(v, sb);
-        offset += 2;
-        length -= 2;
+        case 7:
+          {
+            v |= (ulong)BigEndian.ToUInt32(bytes, offset) << 32;
+            v |= (ulong)BigEndian.ToUInt16(bytes, offset + 4) << 16;
+            v |= (ulong)bytes[offset + 6] << 8;
+            break;
+          }
+        case 6:
+          {
+            v |= (ulong)BigEndian.ToUInt32(bytes, offset) << 32;
+            v |= (ulong)BigEndian.ToUInt16(bytes, offset + 4) << 16;
+            break;
+          }
+        case 5:
+          {
+            v |= (ulong)BigEndian.ToUInt32(bytes, offset) << 32;
+            v |= (ulong)bytes[offset + 4] << 24;
+            break;
+          }
+        case 4:
+          {
+            v |= (ulong)BigEndian.ToUInt32(bytes, offset) << 32;
+            break;
+          }
+        case 3:
+          {
+            v |= (ulong)BigEndian.ToUInt16(bytes, offset) << 48;
+            v |= (ulong)bytes[offset + 2] << 40;
+            break;
+          }
+        case 2:
+          {
+            v |= (ulong)BigEndian.ToUInt16(bytes, offset) << 48;
+            break;
+          }
+        case 1:
+          {
+            v |= (ulong)bytes[offset] << 56;
+            break;
+          }
       }
-#if DELIMITER
-      sb.Append('-', 1);
-#endif
-      if (length == 1)
-      {
-        var v = bytes[offset];
-        Encode(v, sb);
-        offset += 1;
-        length -= 1;
-      }
-      if (appendPaddingChar)
-      {
-        sb.Append(_alphabet.Encode(0)); // padding char
-      }
+      v |= ((uint)length & 7);
+      Encode(v, sb);
+      sb.Append(_alphabet.Encode(0)); // padding char
     }
 
     //// Decode
@@ -199,83 +196,78 @@ namespace Bcl2.PositionalNotation
 
     public void DecodeBytes(string s, int startIndex, int length, Stream outputStream)
     {
-#if DELIMITER
-      length -= 3;
-#endif
       var writer = new BinaryWriter(outputStream);
-      bool removePaddingChar = false;
-      if (_hasCodingIssue)
+      var paddingCharLength = _charCountPerUInt64 + 1;
+      while ((length >= _charCountPerUInt64) & (length != paddingCharLength))
       {
-        var summationFixCharCount = _charCountPerUInt64 + 1;
-        while ((length >= _charCountPerUInt64) & (length != summationFixCharCount))
-        {
-          var v = DecodeUInt64(s, startIndex);
-          if (BitConverter.IsLittleEndian)
-          {
-            v = v.ByteSwap();
-          }
-          writer.Write(v);
-          startIndex += _charCountPerUInt64;
-          length -= _charCountPerUInt64;
-        }
-        removePaddingChar = (length == summationFixCharCount);
-      }
-      else
-      {
-        while (length >= _charCountPerUInt64)
-        {
-          var v = DecodeUInt64(s, startIndex);
-          if (BitConverter.IsLittleEndian)
-          {
-            v = v.ByteSwap();
-          }
-          writer.Write(v);
-          startIndex += _charCountPerUInt64;
-          length -= _charCountPerUInt64;
-        }
-      }
-#if DELIMITER
-      startIndex += 1;
-#endif
-      if (length >= _charCountPerUInt32)
-      {
-        var v = DecodeUInt32(s, startIndex);
+        var v = DecodeUInt64(s, startIndex);
         if (BitConverter.IsLittleEndian)
         {
           v = v.ByteSwap();
         }
         writer.Write(v);
-        startIndex += _charCountPerUInt32;
-        length -= _charCountPerUInt32;
+        startIndex += _charCountPerUInt64;
+        length -= _charCountPerUInt64;
       }
-#if DELIMITER
-      startIndex += 1;
-#endif
-      if (length >= _charCountPerUInt16)
+      if (length == paddingCharLength)
       {
-        var v = DecodeUInt16(s, startIndex);
-        if (BitConverter.IsLittleEndian)
-        {
-          v = v.ByteSwap();
-        }
-        writer.Write(v);
-        startIndex += _charCountPerUInt16;
-        length -= _charCountPerUInt16;
+        DecodeRemainder(s, startIndex, writer);
       }
-#if DELIMITER
-      startIndex += 1;
-#endif
-      if (length >= _charCountPerByte)
+    }
+
+    public void DecodeRemainder(string s, int startIndex, BinaryWriter writer)
+    {
+      var v = DecodeUInt64(s, startIndex);
+      switch (v & 7)
       {
-        var v = DecodeByte(s, startIndex);
-        writer.Write(v);
-        startIndex += _charCountPerByte;
-        length -= _charCountPerByte;
-      }
-      if (removePaddingChar)
-      {
-        startIndex += 1;
-        length -= 1;
+        case 7:
+          {
+            var a = (uint)(v >> 32);
+            writer.Write(a.ByteSwap());
+            var b = (ushort)(v >> 16);
+            writer.Write(b.ByteSwap());
+            writer.Write((byte)(v >> 8));
+            break;
+          }
+        case 6:
+          {
+            var a = (uint)(v >> 32);
+            writer.Write(a.ByteSwap());
+            var b = (ushort)(v >> 16);
+            writer.Write(b.ByteSwap());
+            break;
+          }
+        case 5:
+          {
+            var a = (uint)(v >> 32);
+            writer.Write(a.ByteSwap());
+            writer.Write((byte)(v >> 24));
+            break;
+          }
+        case 4:
+          {
+            var a = (uint)(v >> 32);
+            writer.Write(a.ByteSwap());
+            break;
+          }
+        case 3:
+          {
+            var b = (ushort)(v >> 48);
+            writer.Write(b.ByteSwap());
+            writer.Write((byte)(v >> 40));
+            break;
+          }
+        case 2:
+          {
+            var b = (ushort)(v >> 48);
+            writer.Write(b.ByteSwap());
+            break;
+          }
+        case 1:
+          {
+            writer.Write((byte)(v >> 56));
+            break;
+          }
       }
     }
 

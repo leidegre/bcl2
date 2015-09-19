@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace Bcl2
 {
@@ -21,6 +22,14 @@ namespace Bcl2
       _secureRng.GetBytes(bytes);
     }
 
+    public static double NextSecureDouble()
+    {
+      var bytes = new byte[8];
+      _secureRng.GetBytes(bytes);
+      var v = BitConverter.ToUInt64(bytes, 0);
+      return (double)v / ((double)ulong.MaxValue + 1); // note: we only use 54-bits of precision here
+    }
+
     /// <summary>
     /// Create a new instance of the random class seeded by a cryptographically secure pseudorandom number generator.
     /// </summary>
@@ -32,26 +41,84 @@ namespace Bcl2
       return new Random(seed);
     }
 
-    public static int Next()
+    public static IList<T> NextList<T>(this Random r, IEnumerable<T> source)
     {
-      lock (_rng)
+      var list = new List<T>();
+      foreach (var item in source)
       {
-        return _rng.Next();
+        var i = r.Next(list.Count + 1);
+        if (i == list.Count)
+        {
+          list.Add(item);
+        }
+        else
+        {
+          var temp = list[i];
+          list[i] = item;
+          list.Add(temp);
+        }
+      }
+      return list;
+    }
+
+    public static T NextElement<T>(this Random r, T[] source)
+    {
+      var index = r.Next(source.Length);
+      var v = source[index];
+      return v;
+    }
+
+    internal static IEnumerable<byte> NextByteSequence(this Random r)
+    {
+      for (;;)
+      {
+        var v = (byte)r.Next(byte.MaxValue + 1);
+        yield return v;
       }
     }
 
-    public static long Next64(this Random r)
+    internal static IEnumerable<ushort> NextUInt16Sequence(this Random r)
     {
-      var a = r.Next();
-      var b = r.Next();
-      return Math.BigMul(a, b);
+      for (;;)
+      {
+        var v = (ushort)r.Next(ushort.MaxValue + 1);
+        yield return v;
+      }
     }
 
-    public static long Next64()
+    public static IEnumerable<int> NextInt32Sequence(this Random r)
     {
-      lock (_rng)
+      for (;;)
       {
-        return _rng.Next64();
+        var v = int.MinValue + 2 * r.NextDouble() * int.MaxValue;
+        yield return (int)v;
+      }
+    }
+
+    public static IEnumerable<uint> NextUInt32Sequence(this Random r)
+    {
+      for (;;)
+      {
+        var v = r.NextDouble() * uint.MaxValue;
+        yield return (uint)v;
+      }
+    }
+
+    public static IEnumerable<long> NextInt64Sequence(this Random r)
+    {
+      for (;;)
+      {
+        var v = long.MinValue + 2 * r.NextDouble() * long.MaxValue;
+        yield return (long)v;
+      }
+    }
+
+    public static IEnumerable<ulong> NextUInt64Sequence(this Random r)
+    {
+      for (;;)
+      {
+        var v = r.NextDouble() * ulong.MaxValue;
+        yield return (ulong)v;
       }
     }
   }

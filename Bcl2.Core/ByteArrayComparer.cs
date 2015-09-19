@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace Bcl2
 {
-  public class ByteComparer : IComparer<byte[]>, IEqualityComparer<byte[]>
+  public class ByteArrayComparer : IComparer<byte[]>, IEqualityComparer<byte[]>
   {
     private static int MemoryCompare(byte[] x, byte[] y, int size)
     {

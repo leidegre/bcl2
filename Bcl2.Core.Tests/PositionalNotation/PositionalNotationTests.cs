@@ -11,236 +11,474 @@ namespace Bcl2.PositionalNotation
   [TestFixture]
   public class PositionalNotationTests
   {
+    static class TestBuilder
+    {
+      public class CodingTest<T>
+      {
+        private readonly IEnumerable<T> _source;
+        private readonly Func<T, string> _encoder;
+        private readonly Func<string, T> _decoder;
+        private string _message;
+        private Func<T, string> _strFunc;
+
+        public CodingTest(IEnumerable<T> source, Func<T, string> encoder, Func<string, T> decoder)
+        {
+          this._source = source;
+          this._encoder = encoder;
+          this._decoder = decoder;
+        }
+
+        public CodingTest<T> WithMessage(string message)
+        {
+          this._message = message;
+          return this;
+        }
+
+        public CodingTest<T> WithStringFunction(Func<T, string> strFunc)
+        {
+          this._strFunc = strFunc;
+          return this;
+        }
+
+        public Action Create()
+        {
+          return () => {
+            var list = _source.ToList();
+
+            var q =
+              from v in list
+              let s = _encoder(v)
+              let y = _decoder(s)
+              select Tuple.Create(v, s, y);
+
+            var message = string.Format(_message ?? "Cannot encoder/decode '{0}'", typeof(T));
+
+            int i = 0;
+            foreach (var item in q)
+            {
+              Assert.AreEqual(item.Item1, item.Item3, message);
+#if DEBUG
+              if ((i != 0) & ((i % 100) == 0))
+              {
+                var s = _strFunc != null ? _strFunc(item.Item1) : item.Item1.ToString();
+                Trace.WriteLine(s + " <-> " + item.Item2);
+              }
+#endif
+              i++;
+            }
+          };
+        }
+      }
+
+      public static CodingTest<T> NewCodingTest<T>(IEnumerable<T> source, Func<T, string> encoder, Func<string, T> decoder)
+      {
+        return new CodingTest<T>(source, encoder, decoder);
+      }
+
+      public class LexicographicTest<T>
+      {
+        private readonly IEnumerable<T> _source;
+        private readonly Func<T, string> _encoder;
+        private IComparer<T> _comparer;
+        private string _message;
+        private Func<T, string> _strFunc;
+
+        public LexicographicTest(IEnumerable<T> source, Func<T, string> encoder)
+        {
+          this._source = source;
+          this._encoder = encoder;
+        }
+
+        public LexicographicTest<T> WithComparer(IComparer<T> comparer)
+        {
+          this._comparer = comparer;
+          return this;
+        }
+
+        public LexicographicTest<T> WithMessage(string message)
+        {
+          this._message = message;
+          return this;
+        }
+
+        public LexicographicTest<T> WithStringFunction(Func<T, string> strFunc)
+        {
+          this._strFunc = strFunc;
+          return this;
+        }
+
+        public Action Create()
+        {
+          return () => {
+            var list = _source.ToList();
+
+            var q =
+              from v in list
+              let s = _encoder(v)
+              select Tuple.Create(v, s);
+
+            var a = q.OrderBy(x => x.Item1, _comparer ?? Comparer<T>.Default).ToList();
+            var b = q.OrderBy(x => x.Item2, StringComparer.Ordinal).ToList();
+
+            int i = 0;
+            foreach (var item in b)
+            {
+#if DEBUG
+              if ((i != 0) & ((i % 100) == 0))
+              {
+                var s = _strFunc != null ? _strFunc(item.Item1) : item.Item1.ToString();
+                Trace.WriteLine(s + " -> " + item.Item2);
+              }
+#endif
+              i++;
+            }
+
+            var message = string.Format(_message ?? "Lexicographic ordering is not preserved for '{0}'", typeof(T));
+
+            CollectionAssert.AreEqual(a, b, message);
+          };
+        }
+      }
+
+      public static LexicographicTest<T> NewLexicographicOrderTest<T>(IEnumerable<T> source, Func<T, string> encoder)
+      {
+        return new LexicographicTest<T>(source, encoder);
+      }
+    }
+
     public IEnumerable<BaseConverter> GetBaseTestData()
     {
       yield return BaseConvert.Binary;
       yield return BaseConvert.Decimal;
       yield return BaseConvert.Hexadecimal;
       yield return BaseConvert.Triacontakaidecimal;
+      yield return BaseConvert.Crockford;
       yield return BaseConvert.Base62;
     }
 
-    [TestCaseSource("GetBaseTestData")]
-    public void PositionalNotation_IntegerCodingTest(BaseConverter converter)
+    [Test, TestCaseSource("GetBaseTestData")]
+    public void PositionalNotation_IntBaseExpWithSmallVarCodingTest(BaseConverter converter)
     {
-      var r = Randomness.NextRandom();
+      var q = Enumerable.Range(0, 64)
+        .SelectMany(x => {
+          var log = (ulong)Math.Pow(converter.Base, x);
+          return new[] { log - 1, log, log + 1 };
+        });
 
-      for (int i = 0; i < 1000; i++)
-      {
-        // Byte
-        {
-          var x = (byte)r.Next(byte.MaxValue + 1);
-          var s = converter.Encode(x);
-          var y = converter.DecodeByte(s);
-          Assert.AreEqual(x, y, "Encode/DecodeByte error");
-        }
+      var a = q.TakeWhile(x => x <= byte.MaxValue).Select(x => (byte)x);
+      var b = q.TakeWhile(x => x <= ushort.MaxValue).Select(x => (ushort)x);
+      var c = q.TakeWhile(x => x <= int.MaxValue).Select(x => (int)x);
+      var d = q.TakeWhile(x => x <= uint.MaxValue).Select(x => (uint)x);
+      var e = q.TakeWhile(x => x <= long.MaxValue).Select(x => (long)x);
+      var f = q;
 
-        // UInt16
-        {
-          var x = (ushort)r.Next(ushort.MaxValue + 1);
-          var s = converter.Encode(x);
-          var y = converter.DecodeUInt16(s);
-          Assert.AreEqual(x, y, "Encode/DecodeUInt16 error");
-        }
-
-        // Int32
-        {
-          var x = r.Next() - (int.MaxValue / 2);
-          var s = converter.Encode(x);
-          var y = converter.DecodeInt32(s);
-          Assert.AreEqual(x, y, "Encode/DecodeInt32 error");
-        }
-
-        // UInt32
-        {
-          var x = (uint)r.Next();
-          var s = converter.Encode(x);
-          var y = converter.DecodeUInt32(s);
-          Assert.AreEqual(x, y, "Encode/DecodeUInt32 error");
-        }
-
-        // Int64
-        {
-          var x = r.Next64() - (long.MaxValue / 2);
-          var s = converter.Encode(x);
-          var y = converter.DecodeInt64(s);
-          Assert.AreEqual(x, y, "Encode/DecodeInt64 error");
-        }
-
-        // UInt64
-        {
-          var x = (ulong)r.Next64();
-          var s = converter.Encode(x);
-          var y = converter.DecodeUInt64(s);
-          Assert.AreEqual(x, y, "Encode/DecodeUInt64 error");
-        }
-      }
-    }
-
-    [TestCaseSource("GetBaseTestData")]
-    public void PositionalNotation_LexicographicIntegerCodingTest(BaseConverter converter)
-    {
-      var r = Randomness.NextRandom();
-
-      var list = new List<Tuple<int, string>>(1000);
-      for (int i = 0; i < 1000; i++)
-      {
-        var v = r.Next(int.MinValue, int.MaxValue);
-        var s = converter.Encode(v);
-        list.Add(Tuple.Create(v, s));
-      }
-
-      var list2 = list.OrderBy(x => x.Item1).ToList();
-      var list3 = list.OrderBy(x => x.Item2, StringComparer.Ordinal).ToList();
-
-      CollectionAssert.AreEqual(list2, list3);
-    }
-
-    [Test]
-    public void PositionalNotation_ByteSwapTest()
-    {
-      var r = Randomness.NextRandom();
-
-      // UInt16
-      {
-        var bytes = new byte[2];
-        for (int i = 0; i < 1000; i++)
-        {
-          r.NextBytes(bytes);
-          var reversed = BitConverter.GetBytes(BitConverter.ToUInt16(bytes, 0).ByteSwap());
-          CollectionAssert.AreEqual(bytes.Reverse().ToArray(), reversed);
-        }
-      }
-
-      // UInt32
-      {
-        var bytes = new byte[4];
-        for (int i = 0; i < 1000; i++)
-        {
-          r.NextBytes(bytes);
-          var reversed = BitConverter.GetBytes(BitConverter.ToUInt32(bytes, 0).ByteSwap());
-          CollectionAssert.AreEqual(bytes.Reverse().ToArray(), reversed);
-        }
-      }
-
-      // UInt64
-      {
-        var bytes = new byte[8];
-        for (int i = 0; i < 1000; i++)
-        {
-          r.NextBytes(bytes);
-          var reversed = BitConverter.GetBytes(BitConverter.ToUInt64(bytes, 0).ByteSwap());
-          CollectionAssert.AreEqual(bytes.Reverse().ToArray(), reversed);
-        }
-      }
-    }
-
-    [TestCaseSource("GetBaseTestData")]
-    public void PositionalNotation_BytesCodingTest(BaseConverter converter)
-    {
-      var r = Randomness.NextRandom();
-
-      var bytes = new byte[32];
-      for (int i = 0; i < 1000; i++)
-      {
-        var offset = r.Next(32);
-        var length = r.Next(32 - offset);
-        r.NextBytes(bytes);
-        var s = converter.Encode(bytes, offset, length);
-        var x = converter.DecodeBytes(s);
-        CollectionAssert.AreEqual(bytes.Skip(offset).Take(length).ToArray(), x);
-      }
-    }
-
-    [TestCaseSource("GetBaseTestData")]
-    public void PositionalNotation_LexicographicBytesCodingTest(BaseConverter converter)
-    {
-      var r = Randomness.NextRandom();
-
-      var list = new List<Tuple<byte[], string>>(1000);
-      for (int i = 0; i < 1000; i++)
-      {
-        var bytes = new byte[r.Next(16)];
-        r.NextBytes(bytes);
-        var s = converter.Encode(bytes);
-        list.Add(Tuple.Create(bytes, s));
-      }
-
-      var list2 = list.OrderBy(x => x.Item1, new ByteComparer()).ToList();
-      var list3 = list.OrderBy(x => x.Item2, StringComparer.Ordinal).ToList();
-
-      for (int i = 0; i < 1000; i++)
-      {
-        var item2 = list2[i];
-        Trace.WriteLine(i.ToString("0000") + ": " + BitConverter.ToString(item2.Item1) + " <-> " + item2.Item2);
-
-        var item3 = list3[i];
-        Trace.WriteLine(i.ToString("0000") + ": " + BitConverter.ToString(item3.Item1) + " <-> " + item3.Item2);
-      }
-
-      CollectionAssert.AreEqual(list2, list3);
-    }
-
-    [Test]
-    public void PositionalNotation_Exp()
-    {
-      // here's an issue with bases that don't wrap on a even byte boundary
-      // this is not an issue with bases 2 and 16
-
-      var x = BaseConvert.Base62;
-
-      //var ys = Enumerable.Range(0, 7)
-      //  .SelectMany(y => {
-      //    var yy = (ulong)Math.Pow(62, y);
-      //    return new[] { yy - 1, yy, yy + 1 };
-      //  });
-
-      //foreach (var y in ys)
-      //{
-      //  var a = x.Encode((byte)y);
-      //  var b = x.Encode((ushort)y);
-      //  var c = x.Encode((uint)y);
-      //  var d = x.Encode((ulong)y);
-
-      //  Trace.WriteLine(a + ", " + b + ", " + c + ", " + d);
-      //}
-
-      var ys = new[] {
-        new byte[] { 0 },
-        new byte[] { 1 },
-        new byte[] { 255 },
-        new byte[] { 1, 0 },
-        new byte[] { 1, 1 },
-        new byte[] { 1, 255 },
-        new byte[] { 2, 0 },
-        new byte[] { 2, 1 },
-        new byte[] { 2, 255 },
-        new byte[] { 3, 0, 0 },
-        new byte[] { 3, 0, 1 },
-        new byte[] { 3, 0, 255 },
-        new byte[] { 3, 1, 0 },
-        new byte[] { 3, 1, 1 },
-        new byte[] { 3, 1, 255 },
-        new byte[] { 3, 2, 0 },
-        new byte[] { 3, 2, 1 },
-        new byte[] { 3, 2, 255 },
-        new byte[] { 4, 0, 0, 0 },
-        new byte[] { 4, 0, 0, 1 },
-        new byte[] { 4, 0, 0, 255 },
-        new byte[] { 4, 0, 1, 0 },
-        new byte[] { 4, 0, 1, 1 },
-        new byte[] { 4, 0, 1, 255 },
-        new byte[] { 4, 1, 0, 0 },
-        new byte[] { 4, 1, 0, 1 },
-        new byte[] { 4, 1, 0, 255 },
+      var actions = new Action[] {
+        TestBuilder
+          .NewCodingTest(a, converter.Encode, x => converter.DecodeByte(x, 0))
+          .Create(),
+        TestBuilder
+          .NewCodingTest(b, converter.Encode, x => converter.DecodeUInt16(x, 0))
+          .Create(),
+        TestBuilder
+          .NewCodingTest(c, converter.Encode, x => converter.DecodeInt32(x, 0))
+          .Create(),
+        TestBuilder
+          .NewCodingTest(d, converter.Encode, x => converter.DecodeUInt32(x, 0))
+          .Create(),
+        TestBuilder
+          .NewCodingTest(e, converter.Encode, x => converter.DecodeInt64(x, 0))
+          .Create(),
+        TestBuilder
+          .NewCodingTest(f, converter.Encode, x => converter.DecodeUInt64(x, 0))
+          .Create(),
       };
 
-      foreach (var y in ys)
+      foreach (var action in actions)
       {
-        var a = string.Join(", ", y.Select(z => z.ToString("000")));
-        var b = x.Encode(y);
+        action();
+      }
+    }
 
-        Trace.WriteLine(a + " <-> " + b);
+    [Test, TestCaseSource("GetBaseTestData")]
+    public void PositionalNotation_IntBaseExpWithSmallVarLexTest(BaseConverter converter)
+    {
+      var q = Enumerable.Range(0, 64)
+        .SelectMany(x => {
+          var log = (ulong)Math.Pow(converter.Base, x);
+          return new[] { log - 1, log, log + 1 };
+        });
+
+      var a = q.TakeWhile(x => x <= byte.MaxValue).Select(x => (byte)x);
+      var b = q.TakeWhile(x => x <= ushort.MaxValue).Select(x => (ushort)x);
+      var c = q.TakeWhile(x => x <= int.MaxValue).Select(x => (int)x);
+      var d = q.TakeWhile(x => x <= uint.MaxValue).Select(x => (uint)x);
+      var e = q.TakeWhile(x => x <= long.MaxValue).Select(x => (long)x);
+      var f = q;
+
+      var actions = new Action[] {
+        TestBuilder
+          .NewLexicographicOrderTest(a, converter.Encode)
+          .Create(),
+        TestBuilder
+          .NewLexicographicOrderTest(b, converter.Encode)
+          .Create(),
+        TestBuilder
+          .NewLexicographicOrderTest(c, converter.Encode)
+          .Create(),
+        TestBuilder
+          .NewLexicographicOrderTest(d, converter.Encode)
+          .Create(),
+        TestBuilder
+          .NewLexicographicOrderTest(e, converter.Encode)
+          .Create(),
+        TestBuilder
+          .NewLexicographicOrderTest(f, converter.Encode)
+          .Create(),
+      };
+
+      foreach (var action in actions)
+      {
+        action();
+      }
+    }
+
+    [Test, TestCaseSource("GetBaseTestData")]
+    public void PositionalNotation_IntRandomCodingTest(BaseConverter converter)
+    {
+      var r = Randomness.NextRandom();
+
+      var a = r.NextByteSequence().Take(1000);
+      var b = r.NextUInt16Sequence().Take(1000);
+      var c = r.NextInt32Sequence().Take(1000);
+      var d = r.NextUInt32Sequence().Take(1000);
+      var e = r.NextInt64Sequence().Take(1000);
+      var f = r.NextUInt64Sequence().Take(1000);
+
+      var actions = new Action[] {
+        TestBuilder
+          .NewCodingTest(a, converter.Encode, x => converter.DecodeByte(x, 0))
+          .Create(),
+        TestBuilder
+          .NewCodingTest(b, converter.Encode, x => converter.DecodeUInt16(x, 0))
+          .Create(),
+        TestBuilder
+          .NewCodingTest(c, converter.Encode, x => converter.DecodeInt32(x, 0))
+          .Create(),
+        TestBuilder
+          .NewCodingTest(d, converter.Encode, x => converter.DecodeUInt32(x, 0))
+          .Create(),
+        TestBuilder
+          .NewCodingTest(e, converter.Encode, x => converter.DecodeInt64(x, 0))
+          .Create(),
+        TestBuilder
+          .NewCodingTest(f, converter.Encode, x => converter.DecodeUInt64(x, 0))
+          .Create(),
+      };
+
+      foreach (var action in actions)
+      {
+        action();
+      }
+    }
+
+    [Test, TestCaseSource("GetBaseTestData")]
+    public void PositionalNotation_IntRandomLexTest(BaseConverter converter)
+    {
+      var r = Randomness.NextRandom();
+
+      var a = r.NextByteSequence().Take(1000);
+      var b = r.NextUInt16Sequence().Take(1000);
+      var c = r.NextInt32Sequence().Take(1000);
+      var d = r.NextUInt32Sequence().Take(1000);
+      var e = r.NextInt64Sequence().Take(1000);
+      var f = r.NextUInt64Sequence().Take(1000);
+
+      var actions = new Action[] {
+        TestBuilder
+          .NewLexicographicOrderTest(a, converter.Encode)
+          .Create(),
+        TestBuilder
+          .NewLexicographicOrderTest(b, converter.Encode)
+          .Create(),
+        TestBuilder
+          .NewLexicographicOrderTest(c, converter.Encode)
+          .Create(),
+        TestBuilder
+          .NewLexicographicOrderTest(d, converter.Encode)
+          .Create(),
+        TestBuilder
+          .NewLexicographicOrderTest(e, converter.Encode)
+          .Create(),
+        TestBuilder
+          .NewLexicographicOrderTest(f, converter.Encode)
+          .Create(),
+      };
+
+      foreach (var action in actions)
+      {
+        action();
+      }
+    }
+
+    [Test, TestCaseSource("GetBaseTestData")]
+    public void PositionalNotation_BytesRandomCodingTest(BaseConverter converter)
+    {
+      var r = Randomness.NextRandom();
+
+      var a = Enumerable.Range(0, 1000)
+        .Select(x => {
+          var v = new byte[r.Next(8)];
+          r.NextBytes(v);
+          return v;
+        });
+
+      var b = Enumerable.Range(0, 1000)
+        .Select(x => {
+          var v = new byte[r.Next(16)];
+          r.NextBytes(v);
+          return v;
+        });
+
+      var c = Enumerable.Range(0, 1000)
+        .Select(x => {
+          var v = new byte[r.Next(32)];
+          r.NextBytes(v);
+          return v;
+        });
+
+      var actions = new Action[] {
+        TestBuilder
+          .NewCodingTest(a, converter.Encode, x => converter.DecodeBytes(x))
+          .WithStringFunction(x => string.Join(",", x.Select(y => y.ToString("X2"))))
+          .Create(),
+        TestBuilder
+          .NewCodingTest(b, converter.Encode, x => converter.DecodeBytes(x))
+          .WithStringFunction(x => string.Join(",", x.Select(y => y.ToString("X2"))))
+          .Create(),
+        TestBuilder
+          .NewCodingTest(c, converter.Encode, x => converter.DecodeBytes(x))
+          .WithStringFunction(x => string.Join(",", x.Select(y => y.ToString("X2"))))
+          .Create(),
+      };
+
+      foreach (var action in actions)
+      {
+        action();
+      }
+    }
+
+    [Test, TestCaseSource("GetBaseTestData")]
+    public void PositionalNotation_BytesRandomLexTest(BaseConverter converter)
+    {
+      var r = Randomness.NextRandom();
+
+      var a = Enumerable.Range(0, 1000)
+        .Select(x => {
+          var v = new byte[r.Next(8)];
+          r.NextBytes(v);
+          return v;
+        });
+
+      var b = Enumerable.Range(0, 1000)
+        .Select(x => {
+          var v = new byte[r.Next(16)];
+          r.NextBytes(v);
+          return v;
+        });
+
+      var c = Enumerable.Range(0, 1000)
+        .Select(x => {
+          var v = new byte[r.Next(32)];
+          r.NextBytes(v);
+          return v;
+        });
+
+      var actions = new Action[] {
+        TestBuilder
+          .NewLexicographicOrderTest(a, converter.Encode)
+          .WithComparer(new ByteArrayComparer())
+          .WithStringFunction(x => string.Join(",", x.Select(y => y.ToString("X2"))))
+          .Create(),
+        TestBuilder
+          .NewLexicographicOrderTest(b, converter.Encode)
+          .WithComparer(new ByteArrayComparer())
+          .WithStringFunction(x => string.Join(",", x.Select(y => y.ToString("X2"))))
+          .Create(),
+        TestBuilder
+          .NewLexicographicOrderTest(c, converter.Encode)
+          .WithComparer(new ByteArrayComparer())
+          .WithStringFunction(x => string.Join(",", x.Select(y => y.ToString("X2"))))
+          .Create(),
+      };
+
+      foreach (var action in actions)
+      {
+        action();
+      }
+    }
+
+    [Test, TestCaseSource("GetBaseTestData")]
+    public void PositionalNotation_BytesRemainderCodingTest(BaseConverter converter)
+    {
+      var bytes = new byte[] { 0, 1, 254, 255 };
+
+      var r = Randomness.NextRandom();
+
+      var q = Enumerable.Range(0, 1000)
+        .Select(_ => {
+          var length = r.Next(8);
+          var x = new byte[length];
+          for (int i = 0; i < length; i++)
+          {
+            x[i] = r.NextElement(bytes);
+          }
+          return x;
+        });
+
+      var actions = new Action[] {
+        TestBuilder
+          .NewCodingTest(q, converter.EncodeRemainder, x => converter.DecodeRemainder(x))
+          .WithMessage("Cannot encode/decode 'Remainder'.")
+          .WithStringFunction(x => string.Join(",", x.Select(y => y.ToString("X2"))))
+          .Create(),
+      };
+
+      foreach (var action in actions)
+      {
+        action();
+      }
+    }
+
+    [Test, TestCaseSource("GetBaseTestData")]
+    public void PositionalNotation_BytesRemainderLexTest(BaseConverter converter)
+    {
+      var bytes = new byte[] { 0, 1, 254, 255 };
+
+      var r = Randomness.NextRandom();
+
+      var q = Enumerable.Range(0, 1000)
+        .Select(_ => {
+          var length = r.Next(8);
+          var x = new byte[length];
+          for (int i = 0; i < length; i++)
+          {
+            x[i] = r.NextElement(bytes);
+          }
+          return x;
+        });
+
+      var actions = new Action[] {
+        TestBuilder
+          .NewLexicographicOrderTest(q, converter.EncodeRemainder)
+          .WithComparer(new ByteArrayComparer())
+          .WithMessage("Lexicographic ordering is not preserved for 'Remainder'")
+          .WithStringFunction(x => string.Join(",", x.Select(y => y.ToString("X2"))))
+          .Create(),
+      };
+
+      foreach (var action in actions)
+      {
+        action();
       }
     }
   }

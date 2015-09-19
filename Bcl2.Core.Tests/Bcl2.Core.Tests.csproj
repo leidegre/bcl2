@@ -47,11 +47,13 @@
     <Compile Include="..\Common\CommonAssemblyInfo.cs">
       <Link>Properties\CommonAssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="ByteComparerTests.cs" />
+    <Compile Include="BigEndianTests.cs" />
+    <Compile Include="ByteArrayComparerTests.cs" />
     <Compile Include="EnumerableAssert.cs" />
     <Compile Include="PositionalNotation\AlphabetTests.cs" />
     <Compile Include="PositionalNotation\PositionalNotationTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RandomnessTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

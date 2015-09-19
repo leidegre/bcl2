@@ -1,19 +1,16 @@
 ﻿using NUnit.Framework;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Bcl2
 {
   [TestFixture]
-  public class ByteComparerTests
+  public class ByteArrayComparerTests
   {
     [Test]
-    public void ByteComparer_BaseCaseTest()
+    public void ByteArrayComparer_BaseCaseTest()
     {
-      var comparer = new ByteComparer();
+      var comparer = new ByteArrayComparer();
 
       {
         var a = new byte[0];
@@ -73,9 +70,9 @@ namespace Bcl2
     }
 
     [Test]
-    public void ByteComparer_SortRandomUInt32Test()
+    public void ByteArrayComparer_SortRandomUInt32Test()
     {
-      var comparer = new ByteComparer();
+      var comparer = new ByteArrayComparer();
 
       var r = Randomness.NextRandom();
 

@@ -32,6 +32,14 @@ namespace Bcl2
     public static BaseConverter Triacontakaidecimal { get; private set; }
 
     /// <summary>
+    /// Base 32. Not case sensitive. Crockford's base 32. For expressing numbers in a form that can be conveniently and accurately transmitted between humans and computer systems.
+    /// </summary>
+    /// <remarks>
+    /// See http://www.crockford.com/wrmg/base32.html
+    /// </remarks>
+    public static BaseConverter Crockford { get; private set; }
+
+    /// <summary>
     /// Base 62. Case sensitive.
     /// </summary>
     public static BaseConverter Base62 { get; private set; }
@@ -42,6 +50,7 @@ namespace Bcl2
       Decimal = new BaseConverter("Decimal", new Alphabet("0123456789"));
       Hexadecimal = new BaseConverter("Hexadecimal", new Alphabet("0123456789ABCDEF", "abcdef", "ABCDEF"));
       Triacontakaidecimal = new BaseConverter("Triacontakaidecimal", new Alphabet("0123456789ABCDEFGHIJKLMNOPQRSTUV", "abcdefghijklmnopqrstuv", "ABCDEFGHIJKLMNOPQRSTUV"));
+      Crockford = new BaseConverter("Crockford", new Alphabet("0123456789ABCDEFGHJKMNPQRSTVWXYZ", "OoIiLlabcdefghjkmnpqrstvwxyz", "001111ABCDEFGHJKMNPQRSTVWXYZ"));
       Base62 = new BaseConverter("Base62", new Alphabet("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"));
     }
 
@@ -135,6 +144,22 @@ namespace Bcl2
       return s;
     }
 
+    public static string EncodeRemainder(this BaseConverter converter, byte[] bytes)
+    {
+      return EncodeRemainder(converter, bytes, 0, bytes.Length);
+    }
+
+    public static string EncodeRemainder(this BaseConverter converter, byte[] bytes, int offset, int length)
+    {
+      var sb = ConcurrentObjectPool<StringBuilder>.Get();
+      converter.EncodeRemainder(bytes, offset, length, sb);
+      var s = sb.ToString();
+      // reset
+      sb.Length = 0;
+      ConcurrentObjectPool<StringBuilder>.Put(sb);
+      return s;
+    }
+
     public static byte[] DecodeBytes(this BaseConverter converter, string s)
     {
       return DecodeBytes(converter, s, 0, s.Length);
@@ -153,35 +178,18 @@ namespace Bcl2
       return bytes;
     }
 
-    //// ByteSwap
-
-    public static ushort ByteSwap(this ushort v)
+    public static byte[] DecodeRemainder(this BaseConverter converter, string s, int startIndex = 0)
     {
-      return (ushort)(((v << 8) | (v >> 8)) & 0xffff);
-    }
-
-    public static uint ByteSwap(this uint v)
-    {
-      uint x = (v << 24)
-        | ((v >> 8) & 0x0000ff00U)
-        | ((v << 8) & 0x00ff0000U)
-        | (v >> 24)
-        ;
-      return x;
-    }
-
-    public static ulong ByteSwap(this ulong v)
-    {
-      ulong x = (v << 56)
-        | ((v >> 0x28) & 0x000000000000ff00UL)
-        | ((v >> 0x18) & 0x0000000000ff0000UL)
-        | ((v >> 0x08) & 0x00000000ff000000UL)
-        | ((v << 0x08) & 0x000000ff00000000UL)
-        | ((v << 0x18) & 0x0000ff0000000000UL)
-        | ((v << 0x28) & 0x00ff000000000000UL)
-        | (v >> 56)
-        ;
-      return x;
+      var buffer = ConcurrentObjectPool<MemoryStream>.Get();
+      var writer = new BinaryWriter(buffer);
+      converter.DecodeRemainder(s, startIndex, writer);
+      var bytes = new byte[buffer.Length];
+      buffer.Position = 0;
+      buffer.Read(bytes, 0, bytes.Length);
+      // reset
+      buffer.SetLength(0);
+      ConcurrentObjectPool<MemoryStream>.Put(buffer);
+      return bytes;
     }
   }
 }
