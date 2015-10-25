@@ -1,0 +1,8 @@
+language: csharp
+solution: bcl2.sln
+install:
+  - nuget restore bcl2.sln
+  - nuget install NUnit.Runners -Version 2.6.4 -OutputDirectory nunit
+script:
+  - xbuild /p:Configuration=Release bcl2.sln
+  - mono ./nunit/NUnit.Runners.2.6.4/tools/nunit-console.exe ./Bcl2.Core.Tests/bin/Release/Bcl2.Core.Tests.dll
