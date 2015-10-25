@@ -47,10 +47,14 @@
     <Compile Include="..\Common\CommonAssemblyInfo.cs">
       <Link>Properties\CommonAssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="BigEndianTests.cs" />
+    <Compile Include="BitTwiddlingTests.cs" />
     <Compile Include="ByteArrayComparerTests.cs" />
     <Compile Include="PositionalNotation\AlphabetTests.cs" />
-    <Compile Include="PositionalNotation\PositionalNotationTests.cs" />
+    <Compile Include="PositionalNotation\BigIntTests.cs" />
+    <Compile Include="PositionalNotation\BitGroupTests.cs" />
+    <Compile Include="PositionalNotation\BaseConverter.CommonTests.cs" />
+    <Compile Include="PositionalNotation\BaseConverter.TestBuilder.cs" />
+    <Compile Include="PositionalNotation\BaseConverter.BaseTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RandomnessTests.cs" />
   </ItemGroup>

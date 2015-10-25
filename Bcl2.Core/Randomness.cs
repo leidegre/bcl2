@@ -22,12 +22,19 @@ namespace Bcl2
       _secureRng.GetBytes(bytes);
     }
 
+    /// <summary>
+    /// Generate a random floating-point number that is greater than or equal to 0.0, and less than 1.0.
+    /// </summary>
     public static double NextSecureDouble()
     {
       var bytes = new byte[8];
       _secureRng.GetBytes(bytes);
       var v = BitConverter.ToUInt64(bytes, 0);
-      return (double)v / ((double)ulong.MaxValue + 1); // note: we only use 54-bits of precision here
+      // We only use the 53-bits of integer precision available in a IEEE 754 64-bit double.
+      // The result is a fraction, r = (0, 9007199254740991) / 9007199254740992 where 0 <= r && r < 1.
+      v &= ((1UL << 53) - 1);
+      var r = (double)v / (double)(1UL << 53);
+      return r;
     }
 
     /// <summary>
@@ -41,6 +48,9 @@ namespace Bcl2
       return new Random(seed);
     }
 
+    /// <summary>
+    /// Create a random permutation of the elements in the input sequence.
+    /// </summary>
     public static IList<T> NextList<T>(this Random r, IEnumerable<T> source)
     {
       var list = new List<T>();
@@ -61,6 +71,9 @@ namespace Bcl2
       return list;
     }
 
+    /// <summary>
+    /// Pick an element by random from an array.
+    /// </summary>
     public static T NextElement<T>(this Random r, T[] source)
     {
       var index = r.Next(source.Length);
@@ -68,57 +81,69 @@ namespace Bcl2
       return v;
     }
 
-    internal static IEnumerable<byte> NextByteSequence(this Random r)
+    /// <summary>
+    /// Pick an element by random from a list.
+    /// </summary>
+    public static T NextElement<T>(this Random r, IList<T> source)
     {
-      for (;;)
-      {
-        var v = (byte)r.Next(byte.MaxValue + 1);
-        yield return v;
-      }
+      var index = r.Next(source.Count);
+      var v = source[index];
+      return v;
     }
 
-    internal static IEnumerable<ushort> NextUInt16Sequence(this Random r)
-    {
-      for (;;)
-      {
-        var v = (ushort)r.Next(ushort.MaxValue + 1);
-        yield return v;
-      }
-    }
-
+    /// <summary>
+    /// Generate an infinite sequence of random 32-bit signed integers.
+    /// </summary>
     public static IEnumerable<int> NextInt32Sequence(this Random r)
     {
+      var bytes = new byte[4];
       for (;;)
       {
-        var v = int.MinValue + 2 * r.NextDouble() * int.MaxValue;
-        yield return (int)v;
+        r.NextBytes(bytes);
+        var i = BitConverter.ToInt32(bytes, 0);
+        yield return i;
       }
     }
 
+    /// <summary>
+    /// Generate an infinite sequence of random 32-bit unsigned integers.
+    /// </summary>
     public static IEnumerable<uint> NextUInt32Sequence(this Random r)
     {
+      var bytes = new byte[4];
       for (;;)
       {
-        var v = r.NextDouble() * uint.MaxValue;
-        yield return (uint)v;
+        r.NextBytes(bytes);
+        var u = BitConverter.ToUInt32(bytes, 0);
+        yield return u;
       }
     }
 
+    /// <summary>
+    /// Generate an infinite sequence of random 64-bit signed integers.
+    /// </summary>
     public static IEnumerable<long> NextInt64Sequence(this Random r)
     {
+      var bytes = new byte[8];
       for (;;)
       {
-        var v = long.MinValue + 2 * r.NextDouble() * long.MaxValue;
-        yield return (long)v;
+        r.NextBytes(bytes);
+        var i = BitConverter.ToInt64(bytes, 0);
+        yield return i;
       }
     }
 
+    /// <summary>
+    /// Generate an infinite sequence of random 64-bit unsigned integers.
+    /// </summary>
     public static IEnumerable<ulong> NextUInt64Sequence(this Random r)
     {
+      var bytes = new byte[8];
       for (;;)
       {
-        var v = r.NextDouble() * ulong.MaxValue;
-        yield return (ulong)v;
+        r.NextBytes(bytes);
+        var u = BitConverter.ToUInt64(bytes, 0);
+        yield return u;
       }
     }
   }

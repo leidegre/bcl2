@@ -6,47 +6,88 @@ namespace Bcl2.PositionalNotation
   [TestFixture]
   public class AlphabetTests
   {
-    private readonly Alphabet ABC = new Alphabet("abc");
-
     [Test]
-    public void Alphabet_EncodeDecodeTest()
+    public void Alphabet_EncodeTest()
     {
-      Assert.AreEqual('a', ABC.Encode(0));
-      Assert.AreEqual('b', ABC.Encode(1));
-      Assert.AreEqual('c', ABC.Encode(2));
-
-      Assert.AreEqual(0, ABC.Decode('a'));
-      Assert.AreEqual(1, ABC.Decode('b'));
-      Assert.AreEqual(2, ABC.Decode('c'));
+      var hex = Alphabets.Hexadecimal;
+      var s = "0123456789ABCDEF";
+      for (int i = 0; i < 16; i++)
+      {
+        var ch = hex.Encode(i);
+        Assert.AreEqual(s[i], ch);
+      }
     }
 
-    // note that the run-time does throw an IndexOutOfRange, not ArgumentOutOfRange exception here
+    [Test]
+    public void Alphabet_DecodeTest()
+    {
+      var hex = Alphabets.Hexadecimal;
+      var s = "0123456789ABCDEF";
+      for (int i = 0; i < 16; i++)
+      {
+        var x = hex.Decode(s[i]);
+        Assert.AreEqual(i, x);
+      }
+    }
+
+    [Test]
+    public void Alphabet_DecodeIgnoreCaseTest()
+    {
+      var hex = Alphabets.Hexadecimal;
+      var s = "0123456789abcdef";
+      for (int i = 0; i < 16; i++)
+      {
+        var x = hex.Decode(s[i]);
+        Assert.AreEqual(i, x);
+      }
+    }
+
+    // note that the run-time does throw an IndexOutOfRange, not an ArgumentOutOfRange exception here
     [Test, ExpectedException(typeof(IndexOutOfRangeException))]
     public void Alphabet_EncodeOutOfRangeTest()
     {
-      ABC.Encode(3);
+      Alphabets.Hexadecimal.Encode(16);
     }
 
     [Test, ExpectedException(typeof(ArgumentOutOfRangeException))]
     public void Alphabet_DecodeOutOfRangeTest()
     {
-      ABC.Decode('d');
+      Alphabets.Hexadecimal.Decode('G');
     }
 
-    private readonly Alphabet ToLower = new Alphabet("abc", "ABC", "abc");
+    [Test]
+    public void Alphabet_TryDecode()
+    {
+      int x;
+      Assert.IsFalse(Alphabets.Hexadecimal.TryDecode('G', out x));
+      int y;
+      Assert.IsTrue(Alphabets.Hexadecimal.TryDecode('F', out y));
+    }
 
     [Test]
-    public void Alphabet_EncodeDecodeToLowerTest()
+    public void Alphabet_IsLexicographicTest()
     {
-      // the ToLower alphabet will decode upper case ABC as lower case abc
+      Assert.IsTrue(Alphabets.Binary.IsLexicographic);
+      Assert.IsTrue(Alphabets.Decimal.IsLexicographic);
+      Assert.IsTrue(Alphabets.Hexadecimal.IsLexicographic);
+      Assert.IsTrue(Alphabets.Triacontakaidecimal.IsLexicographic);
+      Assert.IsTrue(Alphabets.Crockford.IsLexicographic);
+      Assert.IsFalse(Alphabets.Base32.IsLexicographic);
+      Assert.IsFalse(Alphabets.Base64.IsLexicographic);
+      Assert.IsTrue(Alphabets.Lexicographic.IsLexicographic);
+    }
 
-      Assert.AreEqual('a', ToLower.Encode(0));
-      Assert.AreEqual('b', ToLower.Encode(1));
-      Assert.AreEqual('c', ToLower.Encode(2));
-
-      Assert.AreEqual(0, ToLower.Decode('A'));
-      Assert.AreEqual(1, ToLower.Decode('B'));
-      Assert.AreEqual(2, ToLower.Decode('C'));
+    [Test]
+    public void Alphabet_IsCaseSensitiveTest()
+    {
+      Assert.IsFalse(Alphabets.Binary.IsCaseSensitive);
+      Assert.IsFalse(Alphabets.Decimal.IsCaseSensitive);
+      Assert.IsFalse(Alphabets.Hexadecimal.IsCaseSensitive);
+      Assert.IsFalse(Alphabets.Triacontakaidecimal.IsCaseSensitive);
+      Assert.IsFalse(Alphabets.Crockford.IsCaseSensitive);
+      Assert.IsFalse(Alphabets.Base32.IsCaseSensitive);
+      Assert.IsTrue(Alphabets.Base64.IsCaseSensitive);
+      Assert.IsTrue(Alphabets.Lexicographic.IsCaseSensitive);
     }
   }
 }

@@ -6,8 +6,20 @@ namespace Bcl2.PositionalNotation
   {
     private readonly sbyte[] _decodeTable;
     private readonly char[] _encodeTable;
+    private readonly bool _isLexicographic;
+    private readonly bool _isCaseSensitive;
 
-    public int Base { get { return _encodeTable.Length; } }
+    public int Length { get { return _encodeTable.Length; } }
+
+    /// <summary>
+    /// True; if ordinal sort rules preserve lexicographical order.
+    /// </summary>
+    public bool IsLexicographic { get { return _isLexicographic; } }
+
+    /// <summary>
+    /// True; if alphabet is case sensitive. False; whenever there is a translation from upper case to corresponding lower case letter or vice versa.
+    /// </summary>
+    public bool IsCaseSensitive { get { return _isCaseSensitive; } }
 
     // this class supports coding of various numerical bases 
     // (standard and non-standard) up to base 127
@@ -36,23 +48,6 @@ namespace Bcl2.PositionalNotation
       }
     }
 
-    public Alphabet(string s, string f = null, string t = null)
-      : this(ToCharArray(s))
-    {
-      if ((f != null) ^ (t != null))
-      {
-        throw new ArgumentException("Either translation tables must to be set or both must be null.");
-      }
-      if ((f != null) & (t != null))
-      {
-        if (f.Length != t.Length)
-        {
-          throw new ArgumentException("Translation tables must be of same length.");
-        }
-        Translate(f.ToCharArray(), t.ToCharArray());
-      }
-    }
-
     private Alphabet(char[] s)
     {
       if (s == null)
@@ -72,16 +67,83 @@ namespace Bcl2.PositionalNotation
       _decodeTable = r;
     }
 
+    public Alphabet(string s, string f = null, string t = null)
+      : this(ToCharArray(s))
+    {
+      if ((f != null) ^ (t != null))
+      {
+        throw new ArgumentException("Either translation tables must to be set or both must be null.");
+      }
+      if ((f != null) & (t != null))
+      {
+        if (f.Length != t.Length)
+        {
+          throw new ArgumentException("Translation tables must be of same length.");
+        }
+        Translate(f.ToCharArray(), t.ToCharArray());
+      }
+      _isLexicographic = CheckLexicographic(s);
+      _isCaseSensitive = CheckCaseSensitivity(s);
+    }
+
+    private static bool CheckLexicographic(string s)
+    {
+      for (int i = 1; i < s.Length; i++)
+      {
+        if (!(string.CompareOrdinal(s, i - 1, s, i, 1) < 0))
+        {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    private bool CheckCaseSensitivity(string s)
+    {
+      for (int i = 0; i < s.Length; i++)
+      {
+        var ch = s[i];
+        int x = Decode(ch);
+        if (char.IsLower(ch))
+        {
+          var upperInvariant = char.ToUpperInvariant(ch);
+          int y;
+          if (!(TryDecode(upperInvariant, out y) && x == y))
+          {
+            // case sensitive
+            return true;
+          }
+        }
+        if (char.IsUpper(ch))
+        {
+          var lowerInvariant = char.ToLowerInvariant(ch);
+          int y;
+          if (!(TryDecode(lowerInvariant, out y) && x == y))
+          {
+            // case sensitive
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
     public char Encode(int v)
     {
       var c = _encodeTable[v];
       return c;
     }
 
+    public bool TryDecode(char c, out int v)
+    {
+      v = _decodeTable[c];
+      return !(v < 0);
+    }
+
     public int Decode(char c)
     {
-      var v = _decodeTable[c];
-      if (v < 0)
+      int v;
+      if (!TryDecode(c, out v))
       {
         throw new ArgumentOutOfRangeException("c", "The character 0x" + (((int)c).ToString("X2")) + " '" + c + "' is not valid for this base.");
       }

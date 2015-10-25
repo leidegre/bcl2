@@ -8,10 +8,10 @@ using System.Threading.Tasks;
 namespace Bcl2
 {
   [TestFixture]
-  public class BigEndianTests
+  public class BitTwiddlingTests
   {
     [Test]
-    public void BigEndian_ByteSwapUInt16Test()
+    public void BitTwiddling_ByteSwapUInt16Test()
     {
       var r = Randomness.NextRandom();
 
@@ -25,7 +25,7 @@ namespace Bcl2
     }
 
     [Test]
-    public void BigEndian_ByteSwapUInt32Test()
+    public void BitTwiddling_ByteSwapUInt32Test()
     {
       var r = Randomness.NextRandom();
 
@@ -39,7 +39,7 @@ namespace Bcl2
     }
 
     [Test]
-    public void BigEndian_ByteSwapUInt64Test()
+    public void BitTwiddling_ByteSwapUInt64Test()
     {
       var r = Randomness.NextRandom();
 
@@ -49,6 +49,24 @@ namespace Bcl2
         r.NextBytes(bytes);
         var reversed = BitConverter.GetBytes(BitConverter.ToUInt64(bytes, 0).ByteSwap());
         CollectionAssert.AreEqual(bytes.Reverse().ToArray(), reversed);
+      }
+    }
+
+    [Test]
+    public void BitTwiddling_IsPowerOfTwo_Int32Test()
+    {
+      for (int i = 0; i < 32; i++)
+      {
+        Assert.IsTrue(BitTwiddling.IsPowerOfTwo(1 << i));
+      }
+    }
+
+    [Test]
+    public void BitTwiddling_IsPowerOfTwo_UInt32Test()
+    {
+      for (int i = 0; i < 32; i++)
+      {
+        Assert.IsTrue(BitTwiddling.IsPowerOfTwo(1u << i));
       }
     }
   }

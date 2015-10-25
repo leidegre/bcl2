@@ -10,62 +10,67 @@ namespace Bcl2
     [Test]
     public void ByteArrayComparer_BaseCaseTest()
     {
-      var comparer = new ByteArrayComparer();
-
       {
         var a = new byte[0];
         var b = new byte[0];
-        Assert.IsTrue(comparer.Compare(a, b) == 0);
-        Assert.IsTrue(comparer.Compare(b, a) == 0);
+        Assert.IsTrue(ByteArrayComparer.Compare(a, b) == 0);
+        Assert.IsTrue(ByteArrayComparer.Compare(b, a) == 0);
       }
 
       {
         var a = new byte[0];
         var b = new byte[1];
-        Assert.IsTrue(comparer.Compare(a, b) < 0);
-        Assert.IsTrue(comparer.Compare(b, a) > 0);
+        Assert.IsTrue(ByteArrayComparer.Compare(a, b) < 0);
+        Assert.IsTrue(ByteArrayComparer.Compare(b, a) > 0);
       }
 
       {
         var a = new byte[] { 1 };
         var b = new byte[] { 2 };
-        Assert.IsTrue(comparer.Compare(a, b) < 0);
-        Assert.IsTrue(comparer.Compare(b, a) > 0);
+        Assert.IsTrue(ByteArrayComparer.Compare(a, b) < 0);
+        Assert.IsTrue(ByteArrayComparer.Compare(b, a) > 0);
       }
 
       {
         var a = new byte[] { 3 };
         var b = new byte[] { 3 };
-        Assert.IsTrue(comparer.Compare(a, b) == 0);
-        Assert.IsTrue(comparer.Compare(b, a) == 0);
+        Assert.IsTrue(ByteArrayComparer.Compare(a, b) == 0);
+        Assert.IsTrue(ByteArrayComparer.Compare(b, a) == 0);
       }
 
       {
         var a = new byte[] { 1, 2 };
         var b = new byte[] { 1, 3 };
-        Assert.IsTrue(comparer.Compare(a, b) < 0);
-        Assert.IsTrue(comparer.Compare(b, a) > 0);
+        Assert.IsTrue(ByteArrayComparer.Compare(a, b) < 0);
+        Assert.IsTrue(ByteArrayComparer.Compare(b, a) > 0);
       }
 
       {
         var a = new byte[] { 1, 2 };
         var b = new byte[] { 1, 2 };
-        Assert.IsTrue(comparer.Compare(a, b) == 0);
-        Assert.IsTrue(comparer.Compare(b, a) == 0);
+        Assert.IsTrue(ByteArrayComparer.Compare(a, b) == 0);
+        Assert.IsTrue(ByteArrayComparer.Compare(b, a) == 0);
+      }
+
+      {
+        var a = new byte[] { 1, 2 };
+        var b = new byte[] { 1, 2, 3 };
+        Assert.IsTrue(ByteArrayComparer.Compare(a, b) < 0);
+        Assert.IsTrue(ByteArrayComparer.Compare(b, a) > 0);
       }
 
       {
         var a = new byte[] { 1, 2, 3 };
         var b = new byte[] { 1, 2, 4 };
-        Assert.IsTrue(comparer.Compare(a, b) < 0);
-        Assert.IsTrue(comparer.Compare(b, a) > 0);
+        Assert.IsTrue(ByteArrayComparer.Compare(a, b) < 0);
+        Assert.IsTrue(ByteArrayComparer.Compare(b, a) > 0);
       }
 
       {
         var a = new byte[] { 1, 2, 3 };
         var b = new byte[] { 1, 2, 3 };
-        Assert.IsTrue(comparer.Compare(a, b) == 0);
-        Assert.IsTrue(comparer.Compare(b, a) == 0);
+        Assert.IsTrue(ByteArrayComparer.Compare(a, b) == 0);
+        Assert.IsTrue(ByteArrayComparer.Compare(b, a) == 0);
       }
     }
 

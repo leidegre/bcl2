@@ -1,4 +1,5 @@
 ﻿using NUnit.Framework;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -10,18 +11,38 @@ namespace Bcl2
     [Test]
     public void Randomness_SecureDoubleTest()
     {
+      RunTrials(1000, 0.02);
+      RunTrials(10000, 0.01);
+    }
+
+    private static void RunTrials(int sampleSize, double errorMargin)
+    {
+      var q = new Queue<double>();
+
+      while (q.Count < sampleSize)
+      {
+        q.Enqueue(Randomness.NextSecureDouble());
+      }
+
       for (int k = 0; k < 1000; k++)
       {
-        var list = new List<double>();
+        // rotate
+        q.Dequeue();
+        q.Enqueue(Randomness.NextSecureDouble());
 
-        for (int i = 0; i < 1000; i++)
-        {
-          list.Add(Randomness.NextSecureDouble());
-        }
+        var avg = q.Average();
 
-        var avg = list.Average();
+        // Dividing by n−1 gives a better estimate of the population 
+        // standard deviation for the larger parent population than dividing by n, 
+        // which gives a result which is correct for the sample only.
 
-        Assert.AreEqual(0.5, avg, 0.05);
+        var actual = Math.Sqrt(q.Sum(x => (x - avg) * (x - avg)) / (q.Count - 1));
+
+        // see http://stats.stackexchange.com/a/1014/4576
+
+        var expected = (q.Max() - q.Min()) / Math.Sqrt(12);
+
+        Assert.AreEqual(expected, actual, errorMargin);
       }
     }
   }
