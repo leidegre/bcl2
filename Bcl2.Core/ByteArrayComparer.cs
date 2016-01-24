@@ -80,12 +80,12 @@ namespace Bcl2
       // This is the FNV-1a hash.
       // See https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function#FNV-1a_hash
 
-      uint hashCode = 0;
+      uint hashCode = 2166136261;
 
       for (int i = 0, len = obj.Length; i < len; i++)
       {
         hashCode ^= obj[i];
-        hashCode += (hashCode << 1) + (hashCode << 4) + (hashCode << 7) + (hashCode << 8) + (hashCode << 24);
+        hashCode *= 16777619;
       }
 
       return (int)hashCode;
